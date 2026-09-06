@@ -1,0 +1,178 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: devops-final/app
+  EKS_CLUSTER: devops-final-dev-eks
+
+permissions:
+  contents: read
+  security-events: write   # necesario para subir resultados SARIF (SAST)
+
+jobs:
+  # ============================================================
+  # 1. BUILD + TEST + LINT (se ejecuta siempre)
+  # ============================================================
+  build-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+      - name: Instalar dependencias
+        working-directory: app
+        run: npm ci
+      - name: Lint
+        working-directory: app
+        run: npm run lint
+      - name: Tests + coverage
+        working-directory: app
+        run: npm test
+
+  # ============================================================
+  # 2. SAST - Analisis estatico de codigo (corre en paralelo)
+  # ============================================================
+  sast:
+    name: SAST (CodeQL)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inicializar CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+      - name: Analisis CodeQL
+        uses: github/codeql-action/analyze@v3
+
+  # ============================================================
+  # 3. BUILD & PUSH de la imagen Docker a ECR
+  #    (solo en push a main, tras pasar build-test y sast)
+  # ============================================================
+  docker:
+    name: Build & Push Docker
+    runs-on: ubuntu-latest
+    needs: [build-test, sast]
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Login a Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Calcular tag de imagen
+        id: meta
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - name: Build imagen
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build -f docker/Dockerfile \
+            -t $REGISTRY/$ECR_REPOSITORY:${{ steps.meta.outputs.tag }} \
+            -t $REGISTRY/$ECR_REPOSITORY:latest .
+      - name: Escaneo de vulnerabilidades de la imagen (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.tag }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+      - name: Subir resultados Trivy a Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+      - name: Push a ECR
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker push $REGISTRY/$ECR_REPOSITORY:${{ steps.meta.outputs.tag }}
+          docker push $REGISTRY/$ECR_REPOSITORY:latest
+
+  # ============================================================
+  # 4. INFRAESTRUCTURA con Terraform
+  # ============================================================
+  terraform:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: docker
+    if: github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - run: terraform init
+      - run: terraform fmt -check
+      - run: terraform validate
+      - run: terraform plan -out=tfplan
+      - run: terraform apply -auto-approve tfplan
+
+  # ============================================================
+  # 5. DESPLIEGUE en Kubernetes
+  # ============================================================
+  deploy:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    needs: [docker, terraform]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Configurar kubectl
+        run: aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
+      - name: Inyectar tag de imagen en el manifiesto
+        env:
+          REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          TAG: ${{ needs.docker.outputs.image_tag }}
+        run: |
+          sed -i "s#CHANGE_ME_ECR_URL:latest#${REGISTRY}/${ECR_REPOSITORY}:${TAG}#g" k8s/01-deployment.yaml
+      - name: Aplicar manifiestos
+        run: |
+          kubectl apply -f k8s/00-namespace.yaml
+          kubectl apply -f k8s/
+      - name: Esperar rollout
+        run: kubectl -n demo-app rollout status deployment/web --timeout=120s
+
+  # ============================================================
+  # 6. DAST - Analisis dinamico sobre el entorno desplegado
+  # ============================================================
+  dast:
+    name: DAST (OWASP ZAP)
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: 'https://demo-app.example.com'
+          fail_action: false
