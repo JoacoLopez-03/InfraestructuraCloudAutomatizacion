@@ -1,0 +1,25 @@
+groups:
+  - name: demo-app-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) > 1
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Tasa alta de errores 5xx"
+          description: "La app supera 1 error 5xx por segundo durante 2 minutos."
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Latencia p95 elevada"
+          description: "El percentil 95 de latencia supera 1s durante 5 minutos."
+
+      - alert: AppDown
+        expr: up{job="demo-app"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "La aplicacion no responde"
