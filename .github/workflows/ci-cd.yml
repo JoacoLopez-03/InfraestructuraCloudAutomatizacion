@@ -1,3 +1,13 @@
+# ============================================================
+# Pipeline CI/CD
+#
+# Los jobs de build, test y analisis estatico (SAST) corren
+# siempre. Los jobs que requieren una cuenta de AWS real
+# (docker push a ECR, terraform, deploy a EKS y DAST) solo se
+# ejecutan si existe la variable de repositorio AWS_ENABLED=true.
+# Asi el pipeline queda en verde en entornos sin credenciales
+# (academicos / forks) y se activa completo cuando hay AWS.
+# ============================================================
 name: CI/CD Pipeline
 
 on:
@@ -62,7 +72,7 @@ jobs:
     name: Build & Push Docker
     runs-on: ubuntu-latest
     needs: [build-test, sast]
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && vars.AWS_ENABLED == 'true'
     outputs:
       image_tag: ${{ steps.meta.outputs.tag }}
     steps:
@@ -111,7 +121,7 @@ jobs:
     name: Terraform Apply
     runs-on: ubuntu-latest
     needs: docker
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && vars.AWS_ENABLED == 'true'
     defaults:
       run:
         working-directory: terraform
@@ -137,7 +147,7 @@ jobs:
     name: Deploy to Kubernetes
     runs-on: ubuntu-latest
     needs: [docker, terraform]
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && vars.AWS_ENABLED == 'true'
     steps:
       - uses: actions/checkout@v4
       - name: Configurar credenciales AWS
@@ -168,7 +178,7 @@ jobs:
     name: DAST (OWASP ZAP)
     runs-on: ubuntu-latest
     needs: deploy
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && vars.AWS_ENABLED == 'true'
     steps:
       - uses: actions/checkout@v4
       - name: OWASP ZAP Baseline Scan
