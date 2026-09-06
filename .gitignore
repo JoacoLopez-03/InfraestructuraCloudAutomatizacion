@@ -1,0 +1,22 @@
+# Node
+node_modules/
+coverage/
+npm-debug.log*
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars          # nunca subir valores reales
+!*.tfvars.example
+
+# Secretos / entorno
+.env
+*.pem
+kubeconfig
+
+# SO / editor
+.DS_Store
+.idea/
+.vscode/

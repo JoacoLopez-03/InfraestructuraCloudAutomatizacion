@@ -1,0 +1,22 @@
+
+> devops-demo-app@1.0.0 test
+> jest --coverage
+
+PASS src/server.test.js
+  DevOps Demo App
+    ✓ GET / responde 200 con mensaje (71 ms)
+    ✓ GET /healthz responde 200 (22 ms)
+    ✓ GET /api/users devuelve un array (4 ms)
+    ✓ GET /metrics expone metricas Prometheus (9 ms)
+
+-----------|---------|----------|---------|---------|-------------------
+File       | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-----------|---------|----------|---------|---------|-------------------
+All files  |   90.62 |    83.33 |      75 |   96.55 |                   
+ server.js |   90.62 |    83.33 |      75 |   96.55 | 58                
+-----------|---------|----------|---------|---------|-------------------
+Test Suites: 1 passed, 1 total
+Tests:       4 passed, 4 total
+Snapshots:   0 total
+Time:        0.546 s, estimated 1 s
+Ran all test suites.
