@@ -1,0 +1,7 @@
+# Copiar a terraform.tfvars y ajustar. NO subir el archivo real al repo.
+region            = "us-east-1"
+project_name      = "devops-final"
+environment       = "dev"
+node_desired_size = 2
+node_min_size     = 1
+node_max_size     = 4
