@@ -1,0 +1,20 @@
+{
+  "name": "devops-demo-app",
+  "version": "1.0.0",
+  "description": "Aplicacion web de demostracion para pipeline CI/CD completo",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "jest --coverage",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "prom-client": "^15.1.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "eslint": "^8.57.0"
+  }
+}
