@@ -4,9 +4,9 @@ metadata:
   name: web-ingress
   namespace: demo-app
   annotations:
-    kubernetes.io/ingress.class: "nginx"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
+  ingressClassName: nginx        # forma correcta desde K8s 1.22 (reemplaza la annotation deprecada)
   rules:
     - host: demo-app.example.com
       http:

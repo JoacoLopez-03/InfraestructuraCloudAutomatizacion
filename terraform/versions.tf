@@ -8,15 +8,18 @@ terraform {
     }
   }
 
-  # Estado remoto para colaboracion en equipo.
-  # El bucket y la tabla se crean una vez, manualmente o en un stack de bootstrap.
-  backend "s3" {
-    bucket         = "devops-tfstate-CHANGE-ME"
-    key            = "proyecto-final/terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "devops-tflock"
-    encrypt        = true
-  }
+  # Estado remoto para colaboracion en equipo (DESACTIVADO por defecto).
+  # Con el backend comentado, Terraform usa estado LOCAL y el proyecto
+  # funciona sin infraestructura previa. Para trabajo en equipo, cree el
+  # bucket S3 + tabla DynamoDB y descomente este bloque ajustando el nombre.
+  #
+  # backend "s3" {
+  #   bucket         = "devops-tfstate-<su-bucket>"
+  #   key            = "proyecto-final/terraform.tfstate"
+  #   region         = "us-east-1"
+  #   dynamodb_table = "devops-tflock"
+  #   encrypt        = true
+  # }
 }
 
 provider "aws" {

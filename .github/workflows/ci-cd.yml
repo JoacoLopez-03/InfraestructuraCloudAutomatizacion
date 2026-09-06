@@ -97,7 +97,7 @@ jobs:
             -t $REGISTRY/$ECR_REPOSITORY:${{ steps.meta.outputs.tag }} \
             -t $REGISTRY/$ECR_REPOSITORY:latest .
       - name: Escaneo de vulnerabilidades de la imagen (Trivy)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.tag }}
           format: 'sarif'
@@ -163,7 +163,7 @@ jobs:
           REGISTRY: ${{ secrets.ECR_REGISTRY }}
           TAG: ${{ needs.docker.outputs.image_tag }}
         run: |
-          sed -i "s#CHANGE_ME_ECR_URL:latest#${REGISTRY}/${ECR_REPOSITORY}:${TAG}#g" k8s/01-deployment.yaml
+          sed -i "s#image: ghcr.io/joacolopez-03/demo-app:latest#image: ${REGISTRY}/${ECR_REPOSITORY}:${TAG}#g" k8s/01-deployment.yaml
       - name: Aplicar manifiestos
         run: |
           kubectl apply -f k8s/00-namespace.yaml

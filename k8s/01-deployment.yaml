@@ -26,7 +26,9 @@ spec:
     spec:
       containers:
         - name: web
-          image: CHANGE_ME_ECR_URL:latest   # el pipeline reemplaza el tag
+          # Imagen de ejemplo valida para poder validar con --dry-run.
+          # El pipeline la reemplaza por la imagen real de ECR en el deploy.
+          image: ghcr.io/joacolopez-03/demo-app:latest
           ports:
             - containerPort: 3000
           env:
@@ -54,5 +56,15 @@ spec:
             periodSeconds: 10
           securityContext:
             runAsNonRoot: true
+            runAsUser: 1000
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          # Con readOnlyRootFilesystem, montamos /tmp como volumen escribible
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

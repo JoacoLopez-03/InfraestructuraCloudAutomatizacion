@@ -1,0 +1,31 @@
+CORRECCIONES APLICADAS TRAS LA DEVOLUCION (validadas con herramientas reales)
+=============================================================================
+
+1. INGRESS (k8s/03-ingress.yaml)
+   - Antes: annotation "kubernetes.io/ingress.class" (DEPRECADA desde K8s 1.22)
+   - Ahora: campo "ingressClassName: nginx" (forma correcta)
+
+2. DEPLOYMENT (k8s/01-deployment.yaml)
+   - Antes: image "CHANGE_ME_ECR_URL:latest" (placeholder, rompe dry-run)
+   - Ahora: imagen de ejemplo valida + emptyDir para /tmp (compatible con
+     readOnlyRootFilesystem) + securityContext reforzado (drop ALL caps, runAsUser)
+
+3. WORKFLOW (.github/workflows/ci-cd.yml)
+   - Antes: aquasecurity/trivy-action@master (no reproducible)
+   - Ahora: aquasecurity/trivy-action@0.24.0 (version fijada)
+   - Actualizado el sed del deploy para la nueva imagen de ejemplo
+
+4. TERRAFORM outputs (terraform/outputs.tf)
+   - Agregado: output "ecr_repository_url" propagado desde el modulo eks al root
+
+5. TERRAFORM backend (terraform/versions.tf)
+   - Antes: backend S3 con bucket "CHANGE-ME" (rompe terraform init)
+   - Ahora: backend comentado -> usa estado local, reproducible sin infra previa
+
+VALIDACIONES EJECUTADAS
+=======================
+- Tests unitarios (Jest):        4 passed, 4 total, 96.55% cobertura
+- kubeconform -strict (K8s):     5 valid, 0 invalid, 0 errors
+- hadolint (Dockerfile):         sin advertencias
+- Sintaxis HCL (python-hcl2):    10/10 archivos .tf validos
+- YAML lint (todos):             todos validos

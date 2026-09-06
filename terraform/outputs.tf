@@ -17,3 +17,8 @@ output "kubeconfig_command" {
   description = "Comando para configurar kubectl"
   value       = "aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name}"
 }
+
+output "ecr_repository_url" {
+  description = "URL del repositorio ECR donde se publican las imagenes"
+  value       = module.eks.ecr_repository_url
+}
